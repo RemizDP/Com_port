@@ -1,76 +1,97 @@
-//#define USE_RTS
-#include <errno.h>
-#include <fcntl.h>      // open(), close(), write(), read()
-#include <stdio.h>      
-#include <stdlib.h>
+#pragma once
+#include <cerrno>
 #include <cstdlib>     
 #include <string>
-#include <string.h>
-#include <termios.h>
-#include <unistd.h>
+#include <cstring>
+#include <termios.h>    // выставление флагов в структуре  (режим работы  порта)
+#include <unistd.h>     // usleep, close(), write(), read();
 #include <poll.h>       // набор дескрипторов
-#include <stdint.h>
+#include <fcntl.h>      // open()
+#include <stdint.h>     // uint8_t и uint32_t
+
+//#include "TApcSerialPort.h"
+//speed_t ConvertBaudRate(uint32_t adwBaudRate);
+speed_t ConvertBaudRate(uint32_t adwBaudRate){
+  speed_t ret = B9600;
+  switch (adwBaudRate)
+  {
+    case 1200:
+      ret = B1200;
+      break;
+    case 2400:
+      ret = B2400;
+      break;
+    case 4800:
+      ret = B4800;
+      break;
+    default:
+      ret = B9600;
+      break;
+  }
+  return ret;
+}//*/
 
 class TApcSerialPort{
 
   public:
-
+    /*TApcSerialPort();
+    TApcSerialPort(uint32_t fd);
+    ~TApcSerialPort();//*/
+    /*int get_FH();
+    int file_open(const std::string astrPortPathName);
+    int file_close();
+    int SetDefaultSettings(uint32_t adwBaudRate);
+    int write(uint8_t* apBuf, size_t astSize, uint32_t adwTimeout, size_t& astWritten);
+    int read(uint8_t* apBuf, size_t astSize, uint32_t adwTimeout, size_t& astRlen);
+//*/
   TApcSerialPort(){
     m_FileHandle =-1;
-    m_PortPathName =(char*)"Not_opened";
   };
-  TApcSerialPort(int fd){
+  TApcSerialPort(uint32_t fd){
     m_FileHandle =fd;
-    m_PortPathName =(char*)"Without_name";
   };
   ~TApcSerialPort(){};
 
   int get_FH(){
     return m_FileHandle;
-  };
-  char* get_name(){
-    return m_PortPathName;
-  }
+  };//*/
 
   /* Открытие файла на чтение и запись, терминальное устройство по этому пути 
   не станет терминальным устройством управления процесса, режим синхронного ввода/вывода
   т.е. пока данные не будут физически записаны, write блокирует вызывающий процесс. 
   */
-  int file_open(const char* astrPortPathName){
-    m_FileHandle = open(astrPortPathName, O_RDWR | O_NOCTTY | O_SYNC);
-    m_PortPathName = (char*)astrPortPathName;
+  int file_open(const std::string astrPortPathName){
+    m_FileHandle = open(astrPortPathName.c_str(), O_RDWR | O_NOCTTY | O_SYNC);
     if (m_FileHandle < 0) {
-      printf("Error opening %s: %s\n", m_PortPathName, strerror(errno));
+      std::cout << "Error opening: "<< astrPortPathName.c_str()<< strerror(errno)<< std::endl;
       return -1;
     }
-    printf("Port is opened\n");
+    std::cout << "Port is opened\n"<< std::endl;
     return 0;
   } 
   
   int file_close(){
     int ret = close(m_FileHandle);
-    if (ret<0)
-      printf("Error closing %s: %s\n", (char*)m_PortPathName, strerror(errno));
-    else
-      printf("Port is closed\n");
-    return ret;
-  }
-
-  /*
-  Настройка флагов взята со StackOverflow
-  */
-  int applyNonCanonicalPortSettings(struct termios& aSettings){
-    if (tcgetattr(m_FileHandle, &aSettings) < 0) {
-      printf("Error from tcgetattr (port isn't opened): %s\n", strerror(errno));
+    if (ret<0){
+      std::cout << "Error closing: "<< strerror(errno)<< std::endl;
       return -1;
     }
+    std::cout << "Port is closed"<< std::endl;
+    return 0;
+  }//*/
+
+  
+  //Настройка флагов взята со StackOverflow
+  
+  int SetDefaultSettings(uint32_t adwBaudRate){
+    struct termios aSettings={};
     aSettings.c_cflag |= (CLOCAL | CREAD);    // игнорировать управление линиями с помощью модема, включить прием 
     aSettings.c_cflag &= ~CSIZE;              // сброс маски размера символов
     aSettings.c_cflag |= CS8;                 // 8-bit символы (установка маски размера)
     //aSettings.c_cflag &= ~PARENB;           // сброс бита четности
     aSettings.c_cflag &= ~CSTOPB;             // установка только одного стопового бита 
     aSettings.c_cflag &= ~CRTSCTS;            // отключение аппаратного управления потоком 
-
+    //*/
     /* setup для неканонического режима (в основном отключение функций терминала и спецсимволов терминала, например Сtrl+Z и др.)
     сброс флагов (IGNBRK -- флаг игнорирования режим BREAK (Ctrl+BREAK), 
                   BRKINT -- флаг сброса очередей, 
@@ -99,51 +120,30 @@ class TApcSerialPort{
     */
 
     //неканонический режим устанавливается функцией 
-    cfmakeraw (&aSettings);
+    cfmakeraw (&aSettings);                 // нет зарезервированного значения для ошибки
     aSettings.c_cflag &= ~PARENB;           // сброс бита четности
 
     //извлекать байты как только становятся доступны
     aSettings.c_cc[VMIN] = 1;               //минимальное кол-во символов для передачи за раз
     aSettings.c_cc[VTIME] = 1;              //время ожидания (задержка) в децисекундах
 
-    if (tcsetattr(m_FileHandle, TCSANOW, &aSettings) != 0) {
-      printf("Error from tcsetattr: %s\n", strerror(errno));
+    speed_t asptBaudRate = ConvertBaudRate(adwBaudRate);
+    int ret = cfsetospeed(&aSettings, asptBaudRate);  //установка скорости вывода
+    if (ret!=0){
+      std::cout << "Error from cfsetospeed: " << strerror(errno) << std::endl;
+      return -1;
+    }
+    ret = cfsetispeed(&aSettings, asptBaudRate);  //установка скорости ввода
+    if (ret!=0){
+      std::cout << "Error from cfsetispeed: " << strerror(errno) << std::endl;
+      return -1;
+    }
+    ret = tcsetattr(m_FileHandle, TCSANOW, &aSettings);
+    if (ret != 0) {
+      std::cout << "Error from tcsetattr: " << strerror(errno) << std::endl;
       return -1;
     }
     return 0; 
-  };
-
-  int applyCanonicalPortSettings(struct termios& aSettings){
-    if (tcgetattr(m_FileHandle, &aSettings) < 0) {
-      printf("Error from tcgetattr (port isn't opened): %s\n", strerror(errno));
-      return -1;
-    }
-    /* set new port settings for canonical input processing */ 
-    aSettings.c_cflag = B9600 | CS8 | CLOCAL;
-    aSettings.c_cflag &= ~CSTOPB;
-    aSettings.c_cflag &= ~PARENB;
-    aSettings.c_iflag = IGNPAR | ICRNL;
-    aSettings.c_oflag = 0;
-    aSettings.c_lflag = ICANON;
-
-    aSettings.c_cc[VMIN] = 1;               //минимальное кол-во символов для передачи за раз
-    aSettings.c_cc[VTIME] = 1;              //время ожидания (задержка) в децисекундах
-    if (tcsetattr(m_FileHandle, TCSANOW, &aSettings) != 0) {
-      printf("Error from tcsetattr: %s\n", strerror(errno));
-      return -1;
-    }
-    return 0;}
-
-  int prepareSettings(struct termios& aSettings, speed_t asptBaudRate){
-    int ret = applyNonCanonicalPortSettings(aSettings);
-    ret += cfsetospeed(&aSettings, asptBaudRate);  //установка скорости вывода
-    ret += cfsetispeed(&aSettings, asptBaudRate);  //установка скорости ввода
-    if (tcsetattr(m_FileHandle, TCSANOW, &aSettings) != 0) {
-      printf("Error from tcsetattr: %s\n", strerror(errno));
-      return -1;
-    }
-    //aSettings.c_cflag |= asptBaudRate;
-    return ret;
   };
 
   // Пишем в порт (StackOverflow). Таймаут в милисекундах.
@@ -153,18 +153,24 @@ class TApcSerialPort{
     struct pollfd fds={};         // для взаимодействия по событиям
     fds.fd=m_FileHandle;
     fds.events = POLLOUT;
-        
-    if (poll(&fds, 1, adwTimeout)==-1){  // ожидает некоторое событие в файловом дескрипторе
+    
+    int ret = poll(&fds, 1, adwTimeout);    // ожидает некоторое событие в файловом дескрипторе
+    if (ret==-1){
+      std::cout << "Error from poll:" << strerror(errno) << std::endl;
       return -1;
     }
 
     if(fds.revents & POLLOUT){
       astWritten = ::write(m_FileHandle, apBuf, astSize);
-      tcdrain(m_FileHandle); // заморозка процессов до окончания записи в память
+      ret = tcdrain(m_FileHandle); // заморозка процессов до окончания записи в память
+      if (ret==-1){
+      std::cout << "Error from tcdrain:" << strerror(errno) << std::endl;
+      return -1;
+    }
       //usleep(1000000);
     }
-    printf("Write ends successfull, Length = %ld\n", astWritten);
-    memset(apBuf, 0, astSize);
+    std::cout << "Write ends successfull, Length = " << astWritten << std::endl;
+    memset(apBuf, 0, astSize);  // нет зарезервированного значения для ошибки
     return 0; 
   };
 
@@ -174,19 +180,20 @@ class TApcSerialPort{
     struct pollfd fds={};
     fds.fd=m_FileHandle;
     fds.events = POLLIN;
-    if (poll(&fds, 1, adwTimeout)==-1){
+
+    int ret = poll(&fds, 1, adwTimeout);    // ожидает некоторое событие в файловом дескрипторе
+    if (ret==-1){
+      std::cout << "Error from poll:" << strerror(errno) << std::endl;
       return -1;
     }
-    usleep(1);
-    
+    //usleep(1000);
     if(fds.revents & POLLIN) {
       astRlen = ::read(m_FileHandle, apBuf, astSize);
         }
-    printf("Read ends successfull, Length = %ld\n", astRlen);
+    std::cout << "Write ends successfull, Length = " << astRlen << std::endl;
     return 0;
-  }
+  }//*/
    private:
 
    int m_FileHandle;
-   char* m_PortPathName;
 };
