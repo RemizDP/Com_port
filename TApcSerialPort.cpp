@@ -1,16 +1,5 @@
-#pragma once
-#include <cerrno>
-#include <cstdlib>     
-#include <string>
-#include <cstring>
-#include <termios.h>    // выставление флагов в структуре  (режим работы  порта)
-#include <unistd.h>     // usleep, close(), write(), read();
-#include <poll.h>       // набор дескрипторов
-#include <fcntl.h>      // open()
-#include <stdint.h>     // uint8_t и uint32_t
+#include "TApcSerialPort.h"
 
-//#include "TApcSerialPort.h"
-//speed_t ConvertBaudRate(uint32_t adwBaudRate);
 speed_t ConvertBaudRate(uint32_t adwBaudRate){
   speed_t ret = B9600;
   switch (adwBaudRate)
@@ -29,38 +18,17 @@ speed_t ConvertBaudRate(uint32_t adwBaudRate){
       break;
   }
   return ret;
-}//*/
+}
 
-class TApcSerialPort{
-
-  public:
-    /*TApcSerialPort();
-    TApcSerialPort(uint32_t fd);
-    ~TApcSerialPort();//*/
-    /*int get_FH();
-    int file_open(const std::string astrPortPathName);
-    int file_close();
-    int SetDefaultSettings(uint32_t adwBaudRate);
-    int write(uint8_t* apBuf, size_t astSize, uint32_t adwTimeout, size_t& astWritten);
-    int read(uint8_t* apBuf, size_t astSize, uint32_t adwTimeout, size_t& astRlen);
-//*/
-  TApcSerialPort(){
-    m_FileHandle =-1;
-  };
-  TApcSerialPort(uint32_t fd){
-    m_FileHandle =fd;
-  };
-  ~TApcSerialPort(){};
-
-  int get_FH(){
+  int TApcSerialPort::get_FH(){
     return m_FileHandle;
-  };//*/
+  };
 
   /* Открытие файла на чтение и запись, терминальное устройство по этому пути 
   не станет терминальным устройством управления процесса, режим синхронного ввода/вывода
   т.е. пока данные не будут физически записаны, write блокирует вызывающий процесс. 
   */
-  int file_open(const std::string astrPortPathName){
+  int TApcSerialPort::file_open(const std::string astrPortPathName){
     m_FileHandle = open(astrPortPathName.c_str(), O_RDWR | O_NOCTTY | O_SYNC);
     if (m_FileHandle < 0) {
       std::cout << "Error opening: "<< astrPortPathName.c_str()<< strerror(errno)<< std::endl;
@@ -70,7 +38,7 @@ class TApcSerialPort{
     return 0;
   } 
   
-  int file_close(){
+  int TApcSerialPort::file_close(){
     int ret = close(m_FileHandle);
     if (ret<0){
       std::cout << "Error closing: "<< strerror(errno)<< std::endl;
@@ -78,12 +46,12 @@ class TApcSerialPort{
     }
     std::cout << "Port is closed"<< std::endl;
     return 0;
-  }//*/
+  }
 
-  
-  //Настройка флагов взята со StackOverflow
-  
-  int SetDefaultSettings(uint32_t adwBaudRate){
+  /*
+  Настройка флагов взята со StackOverflow
+  */
+  int TApcSerialPort::SetDefaultSettings(uint32_t adwBaudRate){
     struct termios aSettings={};
     aSettings.c_cflag |= (CLOCAL | CREAD);    // игнорировать управление линиями с помощью модема, включить прием 
     aSettings.c_cflag &= ~CSIZE;              // сброс маски размера символов
@@ -91,7 +59,7 @@ class TApcSerialPort{
     //aSettings.c_cflag &= ~PARENB;           // сброс бита четности
     aSettings.c_cflag &= ~CSTOPB;             // установка только одного стопового бита 
     aSettings.c_cflag &= ~CRTSCTS;            // отключение аппаратного управления потоком 
-    //*/
+
     /* setup для неканонического режима (в основном отключение функций терминала и спецсимволов терминала, например Сtrl+Z и др.)
     сброс флагов (IGNBRK -- флаг игнорирования режим BREAK (Ctrl+BREAK), 
                   BRKINT -- флаг сброса очередей, 
@@ -147,7 +115,7 @@ class TApcSerialPort{
   };
 
   // Пишем в порт (StackOverflow). Таймаут в милисекундах.
-  int write(uint8_t* apBuf, size_t astSize, uint32_t adwTimeout, size_t& astWritten){
+  int TApcSerialPort::write(uint8_t* apBuf, size_t astSize, uint32_t adwTimeout, size_t& astWritten){
     astWritten = 0;               // количество записанных символов 
 
     struct pollfd fds={};         // для взаимодействия по событиям
@@ -175,7 +143,7 @@ class TApcSerialPort{
   };
 
   // Чтение из порта (StackOverflow). Таймаут в милисекундах.
-  int read(uint8_t* apBuf, size_t astSize, uint32_t adwTimeout, size_t& astRlen){
+  int TApcSerialPort::read(uint8_t* apBuf, size_t astSize, uint32_t adwTimeout, size_t& astRlen){
     astRlen = 0; //кол-во прочитанных символов
     struct pollfd fds={};
     fds.fd=m_FileHandle;
@@ -192,8 +160,4 @@ class TApcSerialPort{
         }
     std::cout << "Write ends successfull, Length = " << astRlen << std::endl;
     return 0;
-  }//*/
-   private:
-
-   int m_FileHandle;
-};
+  }
