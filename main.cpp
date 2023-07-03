@@ -12,7 +12,7 @@ int main(){
     uint32_t adwWriteTimeout=100;
     uint32_t adwReadTimeout=100;
     std::cout << "WriteTimeout: " << adwWriteTimeout << ", ReadTimeout: " << adwReadTimeout << std::endl;
-    int j =0;
+    //int j =0;
     //while(j<1) {
       uint32_t Wsize=1;
       uint8_t wstr[Wsize] = {};
@@ -24,7 +24,7 @@ int main(){
       int nResult = P.write(wstr, Wsize, adwWriteTimeout, astWritten);
       std::cout << "write res: " << nResult << ", written: " << astWritten  << std::endl;
 
-      uint32_t Rsize=100;
+      uint32_t Rsize=2;
       uint8_t rstr[Rsize]={};
       usleep(1000);
 
@@ -37,11 +37,11 @@ int main(){
       }
       std::cout << std::dec<< std::endl << std::endl;
       //memset(rstr, 0, size);
-      j++;
+      //j++;
       //usleep(1000000);
     //}
     std::cout << "================================================================================="<<std::endl;
-    adwReadTimeout-=50;
+    //adwReadTimeout-=50;
   //}
   
   P.file_close();  

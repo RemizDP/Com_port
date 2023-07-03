@@ -20,7 +20,7 @@ speed_t ConvertBaudRate(uint32_t adwBaudRate){
   return ret;
 }
 
-  int TApcSerialPort::get_FH(){
+int TApcSerialPort::get_FH(){
     return m_FileHandle;
   };
 
@@ -53,10 +53,7 @@ speed_t ConvertBaudRate(uint32_t adwBaudRate){
   */
   int TApcSerialPort::SetDefaultSettings(uint32_t adwBaudRate){
     struct termios aSettings={};
-    aSettings.c_cflag |= (CLOCAL | CREAD);    // игнорировать управление линиями с помощью модема, включить прием 
-    aSettings.c_cflag &= ~CSIZE;              // сброс маски размера символов
-    aSettings.c_cflag |= CS8;                 // 8-bit символы (установка маски размера)
-    //aSettings.c_cflag &= ~PARENB;           // сброс бита четности
+    aSettings.c_cflag |= (CLOCAL | CREAD);    // игнорировать управление линиями с помощью модема, включить прием
     aSettings.c_cflag &= ~CSTOPB;             // установка только одного стопового бита 
     aSettings.c_cflag &= ~CRTSCTS;            // отключение аппаратного управления потоком 
 
@@ -81,6 +78,9 @@ speed_t ConvertBaudRate(uint32_t adwBaudRate){
                   )
     сброс         OPOST -- флага включени режима вывода по умолчанию (если OPOST бит не установлен,
                   все остальные флаги игнорируются, а символы выводятся дословно).
+    сброс флагов (CSIZE -- флага маски размера символов,
+                  PARENB -- флага бита четности)
+    установка флага CS8 -- 8-bit символы (установка маски размера)       
 
     значения c_iflag по умолчанию: (BRKINT|ICRNL|IMAXBEL)
     значения c_lflag по умолчанию: (ISIG|ICANON|ECHO|IEXTEN|ECHOE|ECHOKE|ECHOCTL).
@@ -89,7 +89,6 @@ speed_t ConvertBaudRate(uint32_t adwBaudRate){
 
     //неканонический режим устанавливается функцией 
     cfmakeraw (&aSettings);                 // нет зарезервированного значения для ошибки
-    aSettings.c_cflag &= ~PARENB;           // сброс бита четности
 
     //извлекать байты как только становятся доступны
     aSettings.c_cc[VMIN] = 1;               //минимальное кол-во символов для передачи за раз
