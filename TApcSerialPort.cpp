@@ -157,6 +157,6 @@ int TApcSerialPort::get_FH(){
     if(fds.revents & POLLIN) {
       astRlen = ::read(m_FileHandle, apBuf, astSize);
         }
-    std::cout << "Write ends successfull, Length = " << astRlen << std::endl;
+    std::cout << "Read ends successfull, Length = " << astRlen << std::endl;
     return 0;
   }
