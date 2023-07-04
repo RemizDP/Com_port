@@ -7,23 +7,24 @@
 
 #include "TApcSerialPort.h"
 
+
 TApcSerialPort::TApcSerialPort(){
     m_FileHandle =-1;
   };
 TApcSerialPort::TApcSerialPort(uint32_t adwFileHandle){
     m_FileHandle =adwFileHandle;
   };
-speed_t ConvertBaudRate(uint32_t adwBaudRate){
+speed_t ConvertBaudRate(baud_t adwBaudRate){
   speed_t nResult = B9600;
   switch (adwBaudRate)
   {
-    case 1200:
+    case 0:
       nResult = B1200;
       break;
-    case 2400:
+    case 1:
       nResult = B2400;
       break;
-    case 4800:
+    case 2:
       nResult = B4800;
       break;
     default:
@@ -67,7 +68,7 @@ int TApcSerialPort::get_handle(){
     return 0;
   }
 
-  int TApcSerialPort::configure_settings(uint32_t adwBaudRate){
+  int TApcSerialPort::configure_settings(baud_t adwBaudRate){
     struct termios aSettings={};
     aSettings.c_cflag |= (CLOCAL | CREAD);    // игнорировать управление линиями с помощью модема, включить прием
     
