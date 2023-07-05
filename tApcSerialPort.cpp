@@ -1,37 +1,59 @@
-#include <cstring>      // вывод ошибок
+#include <cstring>      // вывод ошибок strerror()
 #include <termios.h>    // выставление флагов в структуре  (режим работы  порта)
 #include <unistd.h>     // usleep, close(), write(), read();
-#include <poll.h>       // набор дескрипторов
+#include <poll.h>       // poll()
 #include <fcntl.h>      // open()
 #include <iostream>
 
-#include "TApcSerialPort.h"
+#include "tApcSerialPort.h"
 
 
-TApcSerialPort::TApcSerialPort(){
-    m_FileHandle =-1;
-  };
-TApcSerialPort::TApcSerialPort(uint32_t adwFileHandle){
-    m_FileHandle =adwFileHandle;
-  };
-speed_t ConvertBaudRate(baud_t adwBaudRate){
-  speed_t nResult = B9600;
-  switch (adwBaudRate)
+
+TApcSerialPort::TApcSerialPort():m_FileHandle(-1){};
+TApcSerialPort::~TApcSerialPort(){
+    if (m_FileHandle < 0){
+      std::cerr << "Error closing: negative handle"<< strerror(errno)<< std::endl;
+    }
+    else{
+      close(m_FileHandle);
+      std::cout << "Port is closed"<< std::endl;
+      std::cout << "================================================================================"<<std::endl;
+    }
+}
+
+int convert_baudrate(enBaudRate aenBaudRate, speed_t& asptBaudRate){
+  switch (aenBaudRate)
   {
-    case 0:
-      nResult = B1200;
+    case enBaudRate::b1200:
+      asptBaudRate = B1200;
       break;
-    case 1:
-      nResult = B2400;
+    case enBaudRate::b2400:
+      asptBaudRate = B2400;
       break;
-    case 2:
-      nResult = B4800;
+    case enBaudRate::b4800:
+      asptBaudRate = B4800;
+      break;
+    case enBaudRate::b9600:
+      asptBaudRate = B9600;
+      break;
+    case enBaudRate::b19200:
+      asptBaudRate = B19200;
+      break;
+    case enBaudRate::b38400:
+      asptBaudRate = B38400;
+      break;
+    case enBaudRate::b57600:
+      asptBaudRate = B57600;
+      break;
+    case enBaudRate::b115200:
+      asptBaudRate = B115200;
       break;
     default:
-      nResult = B9600;
+      std::cerr << "Unexpected value: " << (int)aenBaudRate << std::endl;
+      return -1;
       break;
   }
-  return nResult;
+  return 0;
 }
 
 int TApcSerialPort::get_handle(){
@@ -54,21 +76,16 @@ int TApcSerialPort::get_handle(){
       std::cerr << "Error opening: "<< astrPortPathName.c_str() << " " << strerror(errno)<< std::endl;
       return -1;
     }
+    // дескриптор РЕАЛЬНО ОТКРЫТОГО файла не может быть отрицательным, но на всякий случай проверка
+    if (m_FileHandle < 0){
+      std::cerr << "Something went wrong: negative handle after opening: "<< std::endl;
+      return -1;
+    }
     std::cout << "Port is opened\n"<< std::endl;
     return 0;
   } 
-  
-  int TApcSerialPort::file_close(){
-    int nResult = close(m_FileHandle);
-    if (nResult == -1){
-      std::cerr << "Error closing: "<< strerror(errno)<< std::endl;
-      return -1;
-    }
-    std::cout << "Port is closed"<< std::endl;
-    return 0;
-  }
 
-  int TApcSerialPort::configure_settings(baud_t adwBaudRate){
+  int TApcSerialPort::configure(enBaudRate adwBaudRate){
     struct termios aSettings={};
     aSettings.c_cflag |= (CLOCAL | CREAD);    // игнорировать управление линиями с помощью модема, включить прием
     
@@ -121,8 +138,13 @@ int TApcSerialPort::get_handle(){
     aSettings.c_cc[VMIN] = 1;               //минимальное кол-во символов для передачи за раз
     aSettings.c_cc[VTIME] = 1;              //время ожидания (задержка) в децисекундах
 
-    speed_t asptBaudRate = ConvertBaudRate(adwBaudRate);
-    int nResult = cfsetospeed(&aSettings, asptBaudRate);  //установка скорости вывода
+    speed_t asptBaudRate = 0;
+    int nResult = convert_baudrate(adwBaudRate, asptBaudRate);
+    if (nResult == -1){
+      std::cerr << "Error from convert_baudrate " << std::endl;
+      return -1;
+    }
+    nResult = cfsetospeed(&aSettings, asptBaudRate);  //установка скорости вывода
     if (nResult == -1){
       std::cerr << "Error from cfsetospeed: " << strerror(errno) << std::endl;
       return -1;
@@ -156,22 +178,20 @@ int TApcSerialPort::get_handle(){
       return -1;
     }
     
-    if(fds.revents & POLLOUT){
-      astWritten = ::write(m_FileHandle, apBuf, astSize);
-      if (astWritten == -1){
-        std::cerr << "Error from write" << strerror(errno) << std::endl;
-        }
-      nResult = tcdrain(m_FileHandle); // ждет, пока все данные вывода, записанные на объект, на который ссылается дескриптор, не будут переданы.
-      if (nResult==-1){
+    if(!(fds.revents & POLLOUT)){
+      std::cerr << "Writing is impossible: revent doesn't equal POLLOUT " << std::endl;
+      return -1;
+    }
+    astWritten = ::write(m_FileHandle, apBuf, astSize);
+    if (astWritten == -1){
+      std::cerr << "Error from write" << strerror(errno) << std::endl;
+    }
+    nResult = tcdrain(m_FileHandle); // ждет, пока все данные вывода, записанные на объект, на который ссылается дескриптор, не будут переданы.
+    if (nResult==-1){
       std::cerr << "Error from tcdrain:" << strerror(errno) << std::endl;
       return -1;
     }
-      //usleep(1000000);
-    }
-    else {
-      std::cerr << "Writing is impossible: revent doesn't equal POLLOUT " << strerror(errno) << std::endl;
-      return -1;
-    }
+    //usleep(1000000);
     std::cout << "Write ends successfull, Length = " << astWritten << std::endl;
     memset(apBuf, 0, astSize);  // нет возвращает ошибки
     return 0; 
@@ -190,15 +210,13 @@ int TApcSerialPort::get_handle(){
       return -1;
     }
     //usleep(1000);
-    if(fds.revents & POLLIN) {
-      astRlen = ::read(m_FileHandle, apBuf, astSize);
-      if (astRlen == -1){
-        std::cerr << "Error from read" << strerror(errno) << std::endl;
-        }
-      }
-    else{
-      std::cerr << "Reading is impossible: revent doesn't equal POLLIN " << strerror(errno) << std::endl;
+    if(!(fds.revents & POLLIN)) {
+      std::cerr << "Reading is impossible: revent doesn't equal POLLIN " << std::endl;
       return -1;
+    }
+    astRlen = ::read(m_FileHandle, apBuf, astSize);
+    if (astRlen == -1){
+      std::cerr << "Error from read" << strerror(errno) << std::endl;
     }
     std::cout << "Read ends successfull, Length = " << astRlen << std::endl;
     return 0;
