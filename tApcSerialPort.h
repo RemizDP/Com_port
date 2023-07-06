@@ -2,15 +2,7 @@
 #include <string>       // работа с типом string
 
 // допустимые значения baudrate было решено ограничить набором enum
-enum class enBaudRate : uint32_t {
-  b1200 = 1200,
-  b2400 = 2400,
-  b4800 = 4800,
-  b9600 = 9600,
-  b19200 = 19200,
-  b38400 = 38400,
-  b57600 = 57600,
-  b115200 = 115200};
+enum class enBaudRate : uint8_t {b1200, b2400, b4800, b9600, b19200, b38400, b57600, b115200};
 
 class TApcSerialPort{
 
@@ -37,11 +29,16 @@ class TApcSerialPort{
     Если MIN > 0, TIME > 0, то посимвольный таймаут для чтения, вернется по меньшей мере MIN символов
     Подробнее: http://unixwiz.net/techtips/termios-vmin-vtime.html*/
     int configure(enBaudRate adwBaudRate);
+    int configure(enBaudRate adwBaudRate, uint32_t adwMin, uint32_t adwTime);
 
     /* запись в порт и чтение из порта, реализованы с использованием структуры pollfd. Функция poll использует эту структуру,
     ожидает наступление событий (в нашем случае POLLIN -- символы готовы для прочтения с порта; и POLLOUT символы готовы для записи в порт)*/
     int write(uint8_t* apBuf, size_t astSize, uint32_t adwTimeout, size_t& astWritten);
     int read(uint8_t* apBuf, size_t astSize, uint32_t adwTimeout, size_t& astRlen);
+
+    /*внешние запись и чтение из порта для снятия ограничения количества записанных/прочитанных данных */
+    int cycle_write(uint8_t* apBuf, size_t astSize, size_t astExternSize, uint32_t adwTimeout, uint32_t adwExternTimeout, size_t& astWritten);
+    int cycle_read(uint8_t* apBuf, size_t astSize, size_t astExternSize, uint32_t adwTimeout, uint32_t adwExternTimeout, size_t& astRlen);
   private:
    int m_FileHandle;
 };
