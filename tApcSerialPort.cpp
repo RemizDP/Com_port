@@ -13,7 +13,7 @@
 TApcSerialPort::TApcSerialPort():m_FileHandle(-1){};
 TApcSerialPort::~TApcSerialPort(){
   if (m_FileHandle < 0){
-    std::cerr << "Error closing: negative handle"<< strerror(errno)<< std::endl;
+    std::cerr << "Closing warning: negative handle. "<< strerror(errno)<< std::endl;
   }
   else{
     close(m_FileHandle);
@@ -22,6 +22,20 @@ TApcSerialPort::~TApcSerialPort(){
   }
 }
 
+TApcSerialPort::TApcSerialPort(TApcSerialPort&& ataspPort){
+  m_FileHandle = ataspPort.get_handle();
+  ataspPort.m_FileHandle = -1;
+}
+TApcSerialPort& TApcSerialPort::operator=(TApcSerialPort&& ataspPort){
+  if (&ataspPort == this){
+    return *this;
+  }
+  close(m_FileHandle);
+  //close left
+  m_FileHandle = ataspPort.get_handle();
+  ataspPort.m_FileHandle = -1;
+  return* this;
+}
 int convert_baudrate(enBaudRate aenBaudRate, speed_t& asptBaudRate){
   switch (aenBaudRate)
   {
@@ -195,11 +209,22 @@ int TApcSerialPort::configure(enBaudRate adwBaudRate, uint32_t adwMin, uint32_t 
     std::cerr << "Error from cfsetispeed: " << strerror(errno) << std::endl;
     return -1;
   };
+    // применеине вышеуказанных настроек 
+  nResult = tcsetattr(m_FileHandle, TCSANOW, &aSettings);
+  if (nResult == -1) {
+    std::cerr << "Error from tcsetattr: " << strerror(errno) << std::endl;
+    return -1;
+  }
   return 0;
 };
   // Пишем в порт (Habr). Таймаут в милисекундах. https://habr.com/ru/companies/ruvds/articles/578432/
 int TApcSerialPort::write(uint8_t* apBuf, size_t astSize, uint32_t adwTimeout, size_t& astWritten){
-  astWritten = 0;               // количество записанных символов 
+  astWritten = 0;               // количество записанных символов
+  if (m_FileHandle < 0){
+    std::cerr << "Error: negative handle to write" << std::endl;
+    return -1;
+  }
+   
     struct pollfd fds={};         // для взаимодействия по событиям
   fds.fd=m_FileHandle;
   fds.events = POLLOUT;
@@ -239,6 +264,11 @@ int TApcSerialPort::write(uint8_t* apBuf, size_t astSize, uint32_t adwTimeout, s
 // Чтение из порта (Habr). Таймаут в милисекундах. https://habr.com/ru/companies/ruvds/articles/578432/
 int TApcSerialPort::read(uint8_t* apBuf, size_t astSize, uint32_t adwTimeout, size_t& astRlen){
   astRlen = 0; //кол-во прочитанных символов
+  if (m_FileHandle < 0){
+    std::cerr << "Error: negative handle to read" << std::endl;
+    return -1;
+  }
+  
   struct pollfd fds={};
   fds.fd=m_FileHandle;
   fds.events = POLLIN;
@@ -262,7 +292,7 @@ int TApcSerialPort::read(uint8_t* apBuf, size_t astSize, uint32_t adwTimeout, si
   }
   std::chrono::steady_clock::time_point finish = std::chrono::steady_clock::now();
   const auto dur = finish - start;
-  std::cout << "Read ends successfull, Length = " << astRlen << " Time = " << std::chrono::duration_cast<std::chrono::milliseconds>(dur).count() << std::endl;
+  std::cout << "Read ends successfull, Length = " << astRlen << " Time = " << std::chrono::duration_cast<std::chrono::milliseconds>(dur).count() << " ms." << std::endl;
   return 0;
 }
 
@@ -272,6 +302,7 @@ int TApcSerialPort::cycle_write(uint8_t* apBuf, size_t astSize, size_t astExtern
   uint32_t nTimeout = adwExternTimeout;
   astWritten = 0;
   int nResult = 0;
+  std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
   while ((nSize>0)&&(nTimeout>0)){
     size_t astWr = 0;
     if (nSize < astSize){
@@ -315,7 +346,9 @@ int TApcSerialPort::cycle_write(uint8_t* apBuf, size_t astSize, size_t astExtern
     astWritten += astWr;
     apBuf += astWr;
   }
-  std::cout << "Write ends successfull, Total length = " << astWritten << std::endl;
+  std::chrono::steady_clock::time_point finish = std::chrono::steady_clock::now();
+  const auto dur = finish - start;
+  std::cout << "Write ends successfull, Total length = " << astWritten << " Total Time = " << std::chrono::duration_cast<std::chrono::milliseconds>(dur).count() << " ms." << std::endl;
   //memset(apBuf, 0, astExternSize);  // не возвращает ошибки
   return 0;
 }
@@ -325,6 +358,7 @@ int TApcSerialPort::cycle_read (uint8_t* apBuf, size_t astSize, size_t astExtern
   uint32_t nTimeout = adwExternTimeout;
   size_t nSize = astExternSize;
   astRlen = 0;
+  std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
   while((nSize > 0)&&(nTimeout > 0)){
     size_t astRd = 0;
     if(nSize < astSize){
@@ -368,7 +402,9 @@ int TApcSerialPort::cycle_read (uint8_t* apBuf, size_t astSize, size_t astExtern
     astRlen += astRd;
     apBuf += astRd;
   }
-  std::cout << "Read ends successfull, Total length = " << astRlen << std::endl;
+  std::chrono::steady_clock::time_point finish = std::chrono::steady_clock::now();
+  const auto dur = finish - start;
+  std::cout << "Read ends successfull, Total length = " << astRlen << " Total Time = " << std::chrono::duration_cast<std::chrono::milliseconds>(dur).count() << " ms." << std::endl;
   //memset(apBuf, 0, astExternSize);  // не возвращает ошибки
   return 0;
 }
