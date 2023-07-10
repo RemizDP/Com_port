@@ -254,7 +254,9 @@ int TApcSerialTest::useful_portTest(const std::string astrPortName){
     return -1;
   }
   nResult = moveTest(astrPortName);
-  if (nResult != 0)
+  if (nResult != 0){
+    return -1;
+  }
   nResult = baudrateTest(astrPortName);
   if (nResult != 0){
     return -1;
