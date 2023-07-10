@@ -11,6 +11,7 @@
 
 
 TApcSerialPort::TApcSerialPort():m_FileHandle(-1){};
+TApcSerialPort::TApcSerialPort(const TApcSerialPort& astrPortPathName){};
 TApcSerialPort::~TApcSerialPort(){
   if (m_FileHandle < 0){
     std::cerr << "Closing warning: negative handle. "<< strerror(errno)<< std::endl;
@@ -175,7 +176,7 @@ https://stackoverflow.com/questions/6947413/how-to-open-read-and-write-from-seri
   return 0; 
 };
 
-  // перегрузка функции configure с возможностью задать MIN и TIME
+  // перегрузка функции configure с возможностью задать min и time
 int TApcSerialPort::configure(enBaudRate adwBaudRate, uint32_t adwMin, uint32_t adwTime){
   struct termios aSettings={};
   aSettings.c_cflag |= (CLOCAL | CREAD);    // игнорировать управление линиями с помощью модема, включить прием
@@ -217,6 +218,82 @@ int TApcSerialPort::configure(enBaudRate adwBaudRate, uint32_t adwMin, uint32_t 
   }
   return 0;
 };
+
+int TApcSerialPort::get_baudrate_from_hardware(std::string& astrSettings){
+  struct termios settings = {};
+  tcgetattr(m_FileHandle, &settings);
+  speed_t ispeed = cfgetispeed(&settings);
+  speed_t ospeed = cfgetospeed(&settings);
+  int intISpeed = 0;
+  int intOSpeed = 0;
+  switch (ispeed){
+  case B1200:
+    intISpeed = 1200;
+    break;
+  case B2400:
+    intISpeed = 2400;
+    break;
+  case B4800:
+    intISpeed = 4800;
+    break;
+  case B9600:
+    intISpeed = 9600;
+    break;
+  case B19200:
+    intISpeed = 19200;
+    break;
+  case B38400:
+    intISpeed = 38400;
+    break;
+  case B57600:
+    intISpeed = 57600;
+    break;
+  case B115200:
+    intISpeed = 115200;
+    break;
+  default:
+    std::cerr<<"Unknown speed"<<std::endl;
+    return -1;
+    break;
+    }
+    switch (ospeed){
+    case B1200:
+      intOSpeed = 1200;
+      break;
+    case B2400:
+      intOSpeed = 2400;
+      break;
+    case B4800:
+      intOSpeed = 4800;
+      break;
+    case B9600:
+      intOSpeed = 9600;
+      break;
+    case B19200:
+      intOSpeed = 19200;
+      break;
+    case B38400:
+      intOSpeed = 38400;
+      break;
+    case B57600:
+      intOSpeed = 57600;
+      break;
+    case B115200:
+      intOSpeed = 115200;
+      break;
+    default:
+      std::cerr<<"Unknown speed"<<std::endl;
+      return -1;
+      break;
+    }
+  astrSettings = "Input baudrate: " + std::to_string(intISpeed) + "; Output baudrate: " + std::to_string(intOSpeed);
+  if (intISpeed != intOSpeed){
+    std::cerr<<"Different speeds for input and output"<<std::endl;
+    return -1;
+  }
+  return 0;
+}
+
   // Пишем в порт (Habr). Таймаут в милисекундах. https://habr.com/ru/companies/ruvds/articles/578432/
 int TApcSerialPort::write(uint8_t* apBuf, size_t astSize, uint32_t adwTimeout, size_t& astWritten){
   astWritten = 0;               // количество записанных символов
@@ -296,52 +373,29 @@ int TApcSerialPort::read(uint8_t* apBuf, size_t astSize, uint32_t adwTimeout, si
   return 0;
 }
 
-// Запись в порт с внешним таймаутом и количеством символов
-int TApcSerialPort::cycle_write(uint8_t* apBuf, size_t astSize, size_t astExternSize, uint32_t adwTimeout, uint32_t adwExternTimeout, size_t& astWritten){
-  size_t nSize = astExternSize;
+// Запись в порт с внешним таймаутом. Выполняется запись, пока не истек внешний таймаут или не записано запрашиваемое количество символов
+int TApcSerialPort::cycle_write(uint8_t* apBuf, size_t astSize, uint32_t adwTimeout, uint32_t adwExternTimeout, size_t& astWritten){
   uint32_t nTimeout = adwExternTimeout;
   astWritten = 0;
   int nResult = 0;
   std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
-  while ((nSize>0)&&(nTimeout>0)){
+  while ((astWritten<astSize)&&(nTimeout>0)){
     size_t astWr = 0;
-    if (nSize < astSize){
-      if (nTimeout < adwTimeout){
-        nResult=TApcSerialPort::write(apBuf, nSize, nTimeout, astWr);
-        if (nResult == -1){
-          std::cerr << "Error from write" << std::endl;
-          return -1;
-        }
-        nTimeout = 0;
+    if (nTimeout < adwTimeout){
+      nResult= write(apBuf, astSize, nTimeout, astWr);
+      if (nResult == -1){
+        std::cerr << "Error from write" << std::endl;
+        return -1;
       }
-      else{
-        nResult=TApcSerialPort::write(apBuf, nSize, adwTimeout, astWr);
-        if (nResult == -1){
-          std::cerr << "Error from write" << std::endl;
-          return -1;
-        }
-        nTimeout -= adwTimeout;
+      nTimeout = 0;
       }
-      nSize = 0;
-    }
-    else {
-      if (nTimeout < adwTimeout){
-        nResult=TApcSerialPort::write(apBuf, astSize, nTimeout, astWr);
-        if (nResult == -1){
-          std::cerr << "Error from write" << std::endl;
-          return -1;
-        }
-        nTimeout = 0;
+    else{
+      nResult= write(apBuf, astSize, adwTimeout, astWr);
+      if (nResult == -1){
+        std::cerr << "Error from write" << std::endl;
+        return -1;
       }
-      else{
-        nResult=TApcSerialPort::write(apBuf, astSize, adwTimeout, astWr);
-        if (nResult == -1){
-          std::cerr << "Error from write" << std::endl;
-          return -1;
-        }
-        nTimeout -= adwTimeout;
-      }
-      nSize -= astSize;
+      nTimeout -= adwTimeout;
     }
     astWritten += astWr;
     apBuf += astWr;
@@ -353,51 +407,29 @@ int TApcSerialPort::cycle_write(uint8_t* apBuf, size_t astSize, size_t astExtern
   return 0;
 }
 
-int TApcSerialPort::cycle_read (uint8_t* apBuf, size_t astSize, size_t astExternSize, uint32_t adwTimeout, uint32_t adwExternTimeout, size_t& astRlen){
+// Чтение из порта с внешним таймаутом. Выполняется чтение, пока не истек внешний таймаут или не прочитано запрашиваемое количество символов
+int TApcSerialPort::cycle_read (uint8_t* apBuf, size_t astSize, uint32_t adwTimeout, uint32_t adwExternTimeout, size_t& astRlen){
   int nResult = 0;
   uint32_t nTimeout = adwExternTimeout;
-  size_t nSize = astExternSize;
   astRlen = 0;
   std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
-  while((nSize > 0)&&(nTimeout > 0)){
+  while((astRlen<astSize)&&(nTimeout > 0)){
     size_t astRd = 0;
-    if(nSize < astSize){
-      if (nTimeout < adwTimeout){
-        nResult = TApcSerialPort::read(apBuf, nSize, nTimeout, astRd);
-        if (nResult == -1){
-          std::cerr << "Error from read" << std::endl;
-          return -1;
-        }
-        nTimeout = 0;
+    if (nTimeout < adwTimeout){
+      nResult = read(apBuf, astSize, nTimeout, astRd);
+      if (nResult == -1){
+        std::cerr << "Error from read" << std::endl;
+        return -1;
       }
-      else{
-        nResult = TApcSerialPort::read(apBuf, nSize, adwTimeout, astRd);
-        if (nResult == -1){
-          std::cerr << "Error from read" << std::endl;
-          return -1;
-        }
-        nTimeout -= adwTimeout;
-      }
-      nSize = 0;
+      nTimeout = 0;
     }
     else{
-      if (nTimeout < adwTimeout){
-        nResult = TApcSerialPort::read(apBuf, astSize, nTimeout, astRd);
-        if (nResult == -1){
-          std::cerr << "Error from read" << std::endl;
-          return -1;
-        }
-        nTimeout = 0;
+      nResult = read(apBuf, astSize, adwTimeout, astRd);
+      if (nResult == -1){
+        std::cerr << "Error from read" << std::endl;
+        return -1;
       }
-      else{
-        nResult = TApcSerialPort::read(apBuf, astSize, adwTimeout, astRd);
-        if (nResult == -1){
-          std::cerr << "Error from read" << std::endl;
-          return -1;
-        }
-        nTimeout -= adwTimeout;
-      }
-      nSize -= astSize;
+      nTimeout -= adwTimeout;
     }
     astRlen += astRd;
     apBuf += astRd;
