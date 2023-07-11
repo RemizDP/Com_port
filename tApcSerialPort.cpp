@@ -232,47 +232,36 @@ int TApcSerialPort::configure(enBaudRate adwBaudRate, uint32_t adwMin, uint32_t 
   // несмотря на создание пустой структуры на всякий случай сброс флагов убирать не стал.
   if ((abStopBits == 0) || (abStopBits == 1)){ 
     aSettings.c_cflag &= ~CSTOPB;             // установка только одного стопового бита 
-    std::cout << "1 stopbit has been set, "; 
+    std::cout << "1 stop bit has been set, "; 
   }
   else{
     aSettings.c_cflag |= CSTOPB;             // установка двух стоповых бит
-    std::cout << "2 stopbits has been set, ";
+    std::cout << "2 stop bits has been set, ";
   }
 
   aSettings.c_cflag &= ~CRTSCTS;            // отключение аппаратного управления потоком 
   cfmakeraw (&aSettings);                 // нет возвращает ошибки
-    //извлекать байты как только становятся доступны
-  //параметры влияют на режим чтения: MIN -- на какое минимальное кол-во символов среагирует для чтения
-  //TIME -- время задержки (таймаут на символ). 
-  //Если MIN == 0, TIME == 0, то режим немедленного возврата, т.е. будут доступны только уже принятые символы (в моем случае не влияет)
-  //Если MIN > 0,  TIME == 0, то режим блокирующего чтения
-  //Если MIN == 0, TIME > 0, то возврат по крайней мере одного полученного символа или произойдет истечение времени TIME
-  //Если MIN > 0, TIME > 0, то посимвольный таймаут для чтения, вернется по меньшей мере MIN символов
-  
+
+  aSettings.c_cflag &= ~CSIZE;
   if ((abNumberOfBits == 0) || (abNumberOfBits == 8)){
-    aSettings.c_cflag &= ~CSIZE;
     aSettings.c_cflag |= CS8;
     std::cout << "8-bit characters have been set" << std::endl;
   }
-  if (abNumberOfBits == 5){
-    aSettings.c_cflag &= ~CSIZE;
+  else if (abNumberOfBits == 5){
     aSettings.c_cflag |= CS5;
-    std::cout << "5-bit characters have been set" << std::endl;
+    std::cout << "5-bit characters have been set, ";
   }
-  if (abNumberOfBits == 6){
-    aSettings.c_cflag &= ~CSIZE;
+  else if (abNumberOfBits == 6){
     aSettings.c_cflag |= CS6;
-    std::cout << "6-bit characters have been set" << std::endl;
+    std::cout << "6-bit characters have been set, ";
   }
-  if (abNumberOfBits == 7){
-    aSettings.c_cflag &= ~CSIZE;
+  else if (abNumberOfBits == 7){
     aSettings.c_cflag |= CS7;
-    std::cout << "5-bit characters have been set" << std::endl;
+    std::cout << "7-bit characters have been set, ";
   }
   else {
-    aSettings.c_cflag &= ~CSIZE;
     aSettings.c_cflag |= CS8;
-    std::cout << "8-bit characters have been set" << std::endl;
+    std::cout << "8-bit characters have been set, ";
   }
 
   if (abParityBit == false){
@@ -283,8 +272,13 @@ int TApcSerialPort::configure(enBaudRate adwBaudRate, uint32_t adwMin, uint32_t 
     aSettings.c_cflag |= PARENB;
     std::cout << "Parity bit have been set" << std::endl;
   }
-  
-
+    //извлекать байты как только становятся доступны
+  //параметры влияют на режим чтения: MIN -- на какое минимальное кол-во символов среагирует для чтения
+  //TIME -- время задержки (таймаут на символ). 
+  //Если MIN == 0, TIME == 0, то режим немедленного возврата, т.е. будут доступны только уже принятые символы (в моем случае не влияет)
+  //Если MIN > 0,  TIME == 0, то режим блокирующего чтения
+  //Если MIN == 0, TIME > 0, то возврат по крайней мере одного полученного символа или произойдет истечение времени TIME
+  //Если MIN > 0, TIME > 0, то посимвольный таймаут для чтения, вернется по меньшей мере MIN символов
   aSettings.c_cc[VMIN] = adwMin;               //минимальное кол-во символов для передачи за раз
   aSettings.c_cc[VTIME] = adwTime;             //время ожидания (задержка) в децисекундах
   
@@ -409,14 +403,14 @@ int TApcSerialPort::get_settings_from_hardware(std::string& astrSettings){
     flags += "Character size: CS5, ";
   }
   else{
-    flags += "Penizs, ";
+    flags += "Caslmcakc, ";
   }
 
   if (settings.c_cflag & PARENB){
-    flags += "Parity: On ";
+    flags += "Parity: On, ";
   }
   else{
-    flags += "Parity: Off ";
+    flags += "Parity: Off, ";
   }
 
   if (settings.c_cflag & CSTOPB){

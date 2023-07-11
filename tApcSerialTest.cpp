@@ -35,11 +35,14 @@ int TApcSerialTest::moveTest(const std::string astrPortName){
   }
 
   enBaudRate adwBaudRate = enBaudRate::b9600;
-  nResult = Port1.configure(adwBaudRate);
+  nResult = Port1.configure(adwBaudRate, 0, 0, 7, 1, 5);
   if (nResult != 0){
     std::cerr << "moveTest failed. Error from configure" << std::endl;
     return-1;
   }
+  std::string s ={};
+  Port1.get_settings_from_hardware(s);
+  std::cout << s << std::endl;
   
   size_t astExternWsize = 1;
   uint32_t adwExternWriteTimeout = 100;
@@ -106,15 +109,12 @@ int TApcSerialTest::moveTest(const std::string astrPortName){
  
  /*Поочередно выставляются и выводятся разные скорости, производится сравнение скороти ввода и вывода*/
 int TApcSerialTest::baudrateTest(const std::string astrPortName){
-  TApcSerialPort Port1;
-  int nResult = Port1.file_open(astrPortName);
+  TApcSerialPort Port;
+  int nResult = Port.file_open(astrPortName);
   if (nResult != 0){
     std::cerr << "baudrateTest failed. Port with this name isn't exist" << std::endl;
     return -1;
   }
-
-  TApcSerialPort Port = std::move(Port1);
-  std::cout << "PORT1 handle = " << Port1.get_handle() << std::endl;
 
   size_t array_size = 8;
   enBaudRate adwBaudRate [array_size] = {enBaudRate::b1200, enBaudRate::b2400, enBaudRate::b4800, enBaudRate::b9600, enBaudRate::b19200, enBaudRate::b38400, enBaudRate::b57600, enBaudRate::b115200};
