@@ -12,6 +12,7 @@
 
 TApcSerialPort::TApcSerialPort():m_FileHandle(-1){};
 TApcSerialPort::TApcSerialPort(const TApcSerialPort& astrPortPathName){};
+TApcSerialPort& TApcSerialPort::operator=(const TApcSerialPort& ataspPort){return* this;};
 TApcSerialPort::~TApcSerialPort(){
   if (m_FileHandle < 0){
     std::cerr << "Closing warning: negative handle. "<< strerror(errno)<< std::endl;
@@ -142,6 +143,7 @@ https://stackoverflow.com/questions/6947413/how-to-open-read-and-write-from-seri
   */
     //неканонический режим устанавливается функцией 
   cfmakeraw (&aSettings);                 // нет возвращает ошибки
+
     //извлекать байты как только становятся доступны
   //параметры влияют на режим чтения: MIN -- на какое минимальное кол-во символов среагирует для чтения
   //TIME -- время задержки (таймаут на символ). 
@@ -181,7 +183,8 @@ int TApcSerialPort::configure(enBaudRate adwBaudRate, uint32_t adwMin, uint32_t 
   struct termios aSettings={};
   aSettings.c_cflag |= (CLOCAL | CREAD);    // игнорировать управление линиями с помощью модема, включить прием
   
-  // несмотря на создание пустой структуры на всякий случай сброс флагов убирать не стал. 
+  // несмотря на создание пустой структуры на всякий случай сброс флагов убирать не стал.
+  //aSettings.c_cflag |= CS5;                 // установка маски размера
   aSettings.c_cflag &= ~CSTOPB;             // установка только одного стопового бита 
   aSettings.c_cflag &= ~CRTSCTS;            // отключение аппаратного управления потоком 
   cfmakeraw (&aSettings);                 // нет возвращает ошибки
@@ -195,6 +198,97 @@ int TApcSerialPort::configure(enBaudRate adwBaudRate, uint32_t adwMin, uint32_t 
   aSettings.c_cc[VMIN] = adwMin;               //минимальное кол-во символов для передачи за раз
   aSettings.c_cc[VTIME] = adwTime;              //время ожидания (задержка) в децисекундах
     speed_t asptBaudRate = 0;
+  int nResult = convert_baudrate(adwBaudRate, asptBaudRate);
+  if (nResult == -1){
+    std::cerr << "Error from convert_baudrate " << std::endl;
+    return -1;
+  }
+  nResult = cfsetospeed(&aSettings, asptBaudRate);  //установка скорости вывода
+  if (nResult == -1){
+    std::cerr << "Error from cfsetospeed: " << strerror(errno) << std::endl;
+    return -1;
+  }
+  nResult = cfsetispeed(&aSettings, asptBaudRate);  //установка скорости ввода
+  if (nResult == -1){
+    std::cerr << "Error from cfsetispeed: " << strerror(errno) << std::endl;
+    return -1;
+  };
+    // применеине вышеуказанных настроек 
+  nResult = tcsetattr(m_FileHandle, TCSANOW, &aSettings);
+  if (nResult == -1) {
+    std::cerr << "Error from tcsetattr: " << strerror(errno) << std::endl;
+    return -1;
+  }
+  return 0;
+};
+
+/*Более гибкая функция настройки порта, позволяет настроить маску размера символов (количество бит в символе), четность, количество стоповых битов.
+  Если в 3-х последних параметрах передать нули, то по умолчанию будет установлена схема 8N1
+*/
+int TApcSerialPort::configure(enBaudRate adwBaudRate, uint32_t adwMin, uint32_t adwTime, uint8_t abNumberOfBits, bool abParityBit, uint8_t abStopBits){
+  struct termios aSettings={};
+  aSettings.c_cflag |= (CLOCAL | CREAD);    // игнорировать управление линиями с помощью модема, включить прием
+  
+  // несмотря на создание пустой структуры на всякий случай сброс флагов убирать не стал.
+  if ((abStopBits == 0) || (abStopBits == 1)){ 
+    aSettings.c_cflag &= ~CSTOPB;             // установка только одного стопового бита 
+    std::cout << "1 stopbit has been set, "; 
+  }
+  else{
+    aSettings.c_cflag |= CSTOPB;             // установка двух стоповых бит
+    std::cout << "2 stopbits has been set, ";
+  }
+
+  aSettings.c_cflag &= ~CRTSCTS;            // отключение аппаратного управления потоком 
+  cfmakeraw (&aSettings);                 // нет возвращает ошибки
+    //извлекать байты как только становятся доступны
+  //параметры влияют на режим чтения: MIN -- на какое минимальное кол-во символов среагирует для чтения
+  //TIME -- время задержки (таймаут на символ). 
+  //Если MIN == 0, TIME == 0, то режим немедленного возврата, т.е. будут доступны только уже принятые символы (в моем случае не влияет)
+  //Если MIN > 0,  TIME == 0, то режим блокирующего чтения
+  //Если MIN == 0, TIME > 0, то возврат по крайней мере одного полученного символа или произойдет истечение времени TIME
+  //Если MIN > 0, TIME > 0, то посимвольный таймаут для чтения, вернется по меньшей мере MIN символов
+  
+  if ((abNumberOfBits == 0) || (abNumberOfBits == 8)){
+    aSettings.c_cflag &= ~CSIZE;
+    aSettings.c_cflag |= CS8;
+    std::cout << "8-bit characters have been set" << std::endl;
+  }
+  if (abNumberOfBits == 5){
+    aSettings.c_cflag &= ~CSIZE;
+    aSettings.c_cflag |= CS5;
+    std::cout << "5-bit characters have been set" << std::endl;
+  }
+  if (abNumberOfBits == 6){
+    aSettings.c_cflag &= ~CSIZE;
+    aSettings.c_cflag |= CS6;
+    std::cout << "6-bit characters have been set" << std::endl;
+  }
+  if (abNumberOfBits == 7){
+    aSettings.c_cflag &= ~CSIZE;
+    aSettings.c_cflag |= CS7;
+    std::cout << "5-bit characters have been set" << std::endl;
+  }
+  else {
+    aSettings.c_cflag &= ~CSIZE;
+    aSettings.c_cflag |= CS8;
+    std::cout << "8-bit characters have been set" << std::endl;
+  }
+
+  if (abParityBit == false){
+    aSettings.c_cflag &= ~PARENB;
+    std::cout << "No parity bit have been set" << std::endl;
+  }
+  else{
+    aSettings.c_cflag |= PARENB;
+    std::cout << "Parity bit have been set" << std::endl;
+  }
+  
+
+  aSettings.c_cc[VMIN] = adwMin;               //минимальное кол-во символов для передачи за раз
+  aSettings.c_cc[VTIME] = adwTime;             //время ожидания (задержка) в децисекундах
+  
+  speed_t asptBaudRate = 0;
   int nResult = convert_baudrate(adwBaudRate, asptBaudRate);
   if (nResult == -1){
     std::cerr << "Error from convert_baudrate " << std::endl;
@@ -282,7 +376,7 @@ int TApcSerialPort::get_baudrate_from_hardware(std::string& astrSettings){
       intOSpeed = 115200;
       break;
     default:
-      std::cerr<<"Unknown speed"<<std::endl;
+      std::cerr<<"Unknown speed" << std::endl;
       return -1;
       break;
     }
@@ -292,6 +386,56 @@ int TApcSerialPort::get_baudrate_from_hardware(std::string& astrSettings){
     return -1;
   }
   return 0;
+}
+
+/*Вывод в строку настроек (количества бит на символ, четность, количество стоповых битов, скорости)*/
+int TApcSerialPort::get_settings_from_hardware(std::string& astrSettings){
+  struct termios settings = {};
+  tcgetattr(m_FileHandle, &settings);
+
+  std::string flags = {};
+
+  
+  if (settings.c_cflag & CS8){
+    flags += "Character size: CS8, ";
+  }
+  else if (settings.c_cflag & CS7){
+    flags += "Character size: CS7, ";
+  }
+  else if (settings.c_cflag & CS6){
+    flags += "Character size: CS6, ";
+  }
+  else if (settings.c_cflag & CS5){
+    flags += "Character size: CS5, ";
+  }
+  else{
+    flags += "Penizs, ";
+  }
+
+  if (settings.c_cflag & PARENB){
+    flags += "Parity: On ";
+  }
+  else{
+    flags += "Parity: Off ";
+  }
+
+  if (settings.c_cflag & CSTOPB){
+    flags += "Stop bits: 2 ";
+  }
+  else{
+    flags += "Stop bits: 1 ";
+  }
+
+  astrSettings = flags;
+  flags = {};
+  int nResult = get_baudrate_from_hardware(flags);
+  if(nResult != 0){
+    std::cerr << "Error from get_baudrate_from_hardware" << std::endl;
+    return -1;
+  }
+  astrSettings += flags;
+  return 0; 
+
 }
 
   // Пишем в порт (Habr). Таймаут в милисекундах. https://habr.com/ru/companies/ruvds/articles/578432/

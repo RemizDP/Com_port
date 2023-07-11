@@ -31,8 +31,15 @@ class TApcSerialPort{
     int configure(enBaudRate adwBaudRate);
     int configure(enBaudRate adwBaudRate, uint32_t adwMin, uint32_t adwTime);
 
+    /*Более гибкая функция настройки порта, позволяет настроить маску размера символов (количество бит в символе), четность, количество стоповых битов
+    Если в 3-х последних параметрах передать нули, то по умолчанию будет установлена схема 8N1*/
+    int configure(enBaudRate adwBaudRate, uint32_t adwMin, uint32_t adwTime, uint8_t abNumberOfBits, bool abParityBit, uint8_t abStopBits);
+
     /*Вывод baudrate порта, установленного на текущий момент*/
     int get_baudrate_from_hardware(std::string& astrSettings);
+    /*Вывод в строку настроек (количества бит на символ, четность, количество стоповых битов, скорости)*/
+    int get_settings_from_hardware(std::string& astrSettings);
+
 
     /* запись в порт и чтение из порта, реализованы с использованием структуры pollfd. Функция poll использует эту структуру,
     ожидает наступление событий (в нашем случае POLLIN -- символы готовы для прочтения с порта; и POLLOUT символы готовы для записи в порт)*/
@@ -47,6 +54,11 @@ class TApcSerialPort{
     /* на всякий случай, возвращает значение дескриптора*/
     int get_handle();
   private:
-   int m_FileHandle;
-   TApcSerialPort(const TApcSerialPort& astrPortPathName);
+    /*Запрет использования конструктора копирования, т.к. физический порт копированть нельзя.
+    В противном случае могут произойти ошибки (запись или чтение с использованием уже закрытого порта)*/
+    TApcSerialPort(const TApcSerialPort& astrPortPathName);
+    TApcSerialPort& operator=(const TApcSerialPort& ataspPort);
+
+    int m_FileHandle;
+   
 };

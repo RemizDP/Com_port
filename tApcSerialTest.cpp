@@ -126,9 +126,9 @@ int TApcSerialTest::baudrateTest(const std::string astrPortName){
     }
 
     std::string speed = {};
-    nResult = Port.get_baudrate_from_hardware(speed);
+    nResult = Port.get_settings_from_hardware(speed);
     if (nResult != 0){
-      std::cerr << "baudrateTest failed. Error from get_baudrate_from_hardware" << std::endl;
+      std::cerr << "baudrateTest failed. Error from get_settings_from_hardware" << std::endl;
       return -1;
     }
 
