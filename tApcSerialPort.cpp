@@ -389,17 +389,17 @@ int TApcSerialPort::get_settings_from_hardware(std::string& astrSettings){
 
   std::string flags = {};
 
-  
-  if (settings.c_cflag & CS8){
+  int i_cs8 = (int)(settings.c_cflag & CS8);
+  if (i_cs8 == 48){
     flags += "Character size: CS8, ";
   }
-  else if (settings.c_cflag & CS7){
+  else if (i_cs8 == 32){
     flags += "Character size: CS7, ";
   }
-  else if (settings.c_cflag & CS6){
+  else if (i_cs8 == 16){
     flags += "Character size: CS6, ";
   }
-  else if (settings.c_cflag & CS5){
+  else if (i_cs8 == 0){
     flags += "Character size: CS5, ";
   }
   else{

@@ -35,7 +35,7 @@ int TApcSerialTest::moveTest(const std::string astrPortName){
   }
 
   enBaudRate adwBaudRate = enBaudRate::b9600;
-  nResult = Port1.configure(adwBaudRate, 0, 0, 7, 1, 5);
+  nResult = Port1.configure(adwBaudRate, 0, 0, 0, 0, 0);
   if (nResult != 0){
     std::cerr << "moveTest failed. Error from configure" << std::endl;
     return-1;
